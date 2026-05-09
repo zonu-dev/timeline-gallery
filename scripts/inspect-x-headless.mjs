@@ -12,6 +12,9 @@ const chromePath =
   process.env.CHROME_EXECUTABLE_PATH ??
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const enableGallery = process.argv.includes('--enable-gallery');
+const galleryImageCount = parseGalleryImageCount(
+  process.env.TIMELINE_GALLERY_IMAGE_COUNT,
+);
 const extensionName = 'Timeline Gallery';
 
 if (!existsSync(chromePath)) {
@@ -108,7 +111,9 @@ try {
     process.exitCode = 2;
   } else {
     if (enableGallery) {
-      await setGalleryMode(browser, true);
+      await setGalleryMode(browser, true, {
+        imageCount: galleryImageCount,
+      });
       await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
       await page.waitForSelector('main[role="main"]', { timeout: 30_000 });
       await wait(6_000);
@@ -139,30 +144,49 @@ try {
   await browser.close();
 }
 
-async function setGalleryMode(browser, enabled) {
+async function setGalleryMode(browser, enabled, options) {
   const worker = await findExtensionWorker(browser);
   if (!worker) {
     throw new Error('Extension service worker is not available.');
   }
 
-  await worker.evaluate(async (nextEnabled) => {
-    const key = 'timeline-gallery:state';
-    const values = await chrome.storage.local.get(key);
-    const current = values[key] ?? {};
-    await chrome.storage.local.set({
-      [key]: {
-        installedAt: current.installedAt ?? Date.now(),
-        contentReadyCount: current.contentReadyCount ?? 0,
-        lastContentPage: current.lastContentPage ?? null,
-        galleryMode: {
-          enabled: nextEnabled,
-          includeVideos: false,
-          includeGifs: false,
-          includeMultiImagePosts: false,
+  await worker.evaluate(
+    async ({ nextEnabled, nextOptions }) => {
+      const key = 'timeline-gallery:state';
+      const values = await chrome.storage.local.get(key);
+      const current = values[key] ?? {};
+      await chrome.storage.local.set({
+        [key]: {
+          installedAt: current.installedAt ?? Date.now(),
+          contentReadyCount: current.contentReadyCount ?? 0,
+          lastContentPage: current.lastContentPage ?? null,
+          galleryMode: {
+            enabled: nextEnabled,
+            includeVideos: false,
+            includeGifs: false,
+            imageCount: nextOptions.imageCount,
+            mediaSize: 'm',
+            showAccountInfo: false,
+            showPostTime: false,
+            showRepostContext: false,
+            showLikeCount: false,
+            showRepostCount: false,
+            showReply: false,
+            showViewCount: false,
+            showShareButton: false,
+            showLeftSidebar: false,
+            showRightSidebar: false,
+          },
         },
-      },
-    });
-  }, enabled);
+      });
+    },
+    { nextEnabled: enabled, nextOptions: options },
+  );
+}
+
+function parseGalleryImageCount(value) {
+  const parsed = Number(value ?? 1);
+  return parsed === 2 || parsed === 3 || parsed === 4 ? parsed : 1;
 }
 
 async function findExtensionWorker(browser) {
@@ -223,7 +247,6 @@ async function readXPageSummary(page) {
     const primaryColumn = document
       .querySelector('[data-testid="primaryColumn"]')
       ?.getBoundingClientRect();
-
     return {
       url: location.href,
       title: document.title,

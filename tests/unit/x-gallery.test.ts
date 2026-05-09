@@ -6,8 +6,14 @@ import {
   GALLERY_MENU_SUPPRESSED_ATTRIBUTE,
   GALLERY_MEDIA_BLOCK_ATTRIBUTE,
   GALLERY_MEDIA_ORIENTATION_ATTRIBUTE,
+  GALLERY_MEDIA_SIZE_ATTRIBUTE,
   GALLERY_POST_ATTRIBUTE,
+  GALLERY_REPOST_CONTEXT_ATTRIBUTE,
   GALLERY_ROOT_ATTRIBUTE,
+  GALLERY_SHOW_ACCOUNT_INFO_ATTRIBUTE,
+  GALLERY_SHOW_LEFT_SIDEBAR_ATTRIBUTE,
+  GALLERY_SHOW_REPOST_CONTEXT_ATTRIBUTE,
+  GALLERY_SHOW_REPLY_ATTRIBUTE,
   GALLERY_SIMPLIFY_POSTS_ATTRIBUTE,
   GALLERY_STYLE_ID,
   NATIVE_MENU_BUTTON_CLASS,
@@ -66,7 +72,7 @@ describe('x-gallery', () => {
     ).not.toBeNull();
   });
 
-  it('allows multiple image posts when that setting is enabled', () => {
+  it('allows image posts up to the configured image count', () => {
     document.body.innerHTML = `
       <article id="multi-image" data-testid="tweet">
         <a href="/example/status/2/photo/1">
@@ -81,7 +87,50 @@ describe('x-gallery', () => {
     expect(
       classifyGalleryPost(document.querySelector('article')!, {
         ...DEFAULT_GALLERY_MODE_SETTINGS,
-        includeMultiImagePosts: true,
+        imageCount: 2,
+      }),
+    ).toBe('single-image');
+
+    expect(
+      classifyGalleryPost(
+        document.querySelector('article')!,
+        DEFAULT_GALLERY_MODE_SETTINGS,
+      ),
+    ).toBe('hidden-multiple-images');
+  });
+
+  it('shows GIF and video posts only when their settings are enabled', () => {
+    document.body.innerHTML = `
+      <article id="gif" data-testid="tweet">
+        <div data-testid="gifPlayer"></div>
+      </article>
+      <article id="video" data-testid="tweet">
+        <div data-testid="videoPlayer"></div>
+      </article>
+    `;
+
+    expect(
+      classifyGalleryPost(
+        document.getElementById('gif')!,
+        DEFAULT_GALLERY_MODE_SETTINGS,
+      ),
+    ).toBe('hidden-gif');
+    expect(
+      classifyGalleryPost(document.getElementById('gif')!, {
+        ...DEFAULT_GALLERY_MODE_SETTINGS,
+        includeGifs: true,
+      }),
+    ).toBe('single-image');
+    expect(
+      classifyGalleryPost(
+        document.getElementById('video')!,
+        DEFAULT_GALLERY_MODE_SETTINGS,
+      ),
+    ).toBe('hidden-video');
+    expect(
+      classifyGalleryPost(document.getElementById('video')!, {
+        ...DEFAULT_GALLERY_MODE_SETTINGS,
+        includeVideos: true,
       }),
     ).toBe('single-image');
   });
@@ -508,6 +557,56 @@ describe('x-gallery', () => {
         .getElementById('social-row')
         ?.getAttribute(GALLERY_HIDDEN_CHROME_ATTRIBUTE),
     ).toBe('true');
+    expect(
+      document
+        .getElementById('social-row')
+        ?.getAttribute(GALLERY_REPOST_CONTEXT_ATTRIBUTE),
+    ).toBe('true');
+  });
+
+  it('marks repost context rows as revealable when enabled', () => {
+    document.body.innerHTML = `
+      <article data-testid="tweet">
+        <div>
+          <div id="social-row">
+            <svg aria-label="Repost"></svg>
+            <div data-testid="socialContext">Exampleさんがリポスト</div>
+          </div>
+          <div>
+            <a href="/example/status/1/photo/1">
+              <div data-testid="tweetPhoto"><img src="https://pbs.twimg.com/media/a.jpg" /></div>
+            </a>
+            <div role="group"><button data-testid="like"></button></div>
+          </div>
+        </div>
+      </article>
+    `;
+    const settings = {
+      ...DEFAULT_GALLERY_MODE_SETTINGS,
+      showRepostContext: true,
+    };
+
+    setXGalleryModeEnabled(document, true, { settings });
+    applyXGalleryMode(document, settings);
+
+    expect(
+      document.documentElement.getAttribute(
+        GALLERY_SHOW_REPOST_CONTEXT_ATTRIBUTE,
+      ),
+    ).toBe('true');
+    expect(
+      document
+        .getElementById('social-row')
+        ?.getAttribute(GALLERY_HIDDEN_CHROME_ATTRIBUTE),
+    ).toBe('true');
+    expect(
+      document
+        .getElementById('social-row')
+        ?.getAttribute(GALLERY_REPOST_CONTEXT_ATTRIBUTE),
+    ).toBe('true');
+    expect(document.getElementById(GALLERY_STYLE_ID)?.textContent).toContain(
+      GALLERY_REPOST_CONTEXT_ATTRIBUTE,
+    );
   });
 
   it('marks landscape media with an aspect ratio for gallery layout', () => {
@@ -571,6 +670,41 @@ describe('x-gallery', () => {
     expect(
       document.querySelector(`.${NOT_INTERESTED_BUTTON_CLASS}`),
     ).toBeNull();
+  });
+
+  it('sets root attributes for gallery detail settings', () => {
+    setXGalleryModeEnabled(document, true, {
+      settings: {
+        ...DEFAULT_GALLERY_MODE_SETTINGS,
+        mediaSize: 'l',
+        showAccountInfo: true,
+        showRepostContext: true,
+        showReply: true,
+        showLeftSidebar: true,
+      },
+    });
+
+    expect(
+      document.documentElement.getAttribute(GALLERY_MEDIA_SIZE_ATTRIBUTE),
+    ).toBe('l');
+    expect(
+      document.documentElement.getAttribute(
+        GALLERY_SHOW_ACCOUNT_INFO_ATTRIBUTE,
+      ),
+    ).toBe('true');
+    expect(
+      document.documentElement.getAttribute(
+        GALLERY_SHOW_REPOST_CONTEXT_ATTRIBUTE,
+      ),
+    ).toBe('true');
+    expect(
+      document.documentElement.getAttribute(GALLERY_SHOW_REPLY_ATTRIBUTE),
+    ).toBe('true');
+    expect(
+      document.documentElement.getAttribute(
+        GALLERY_SHOW_LEFT_SIDEBAR_ATTRIBUTE,
+      ),
+    ).toBe('true');
   });
 
   it('removes gallery markers and custom buttons when disabled', () => {

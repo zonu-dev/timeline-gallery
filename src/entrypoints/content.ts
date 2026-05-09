@@ -84,11 +84,17 @@ function createGalleryController() {
     }
 
     if (isXPostDetailPath(location.pathname)) {
-      setXGalleryModeEnabled(document, true, { simplifyPosts: false });
+      setXGalleryModeEnabled(document, true, {
+        settings: currentSettings,
+        simplifyPosts: false,
+      });
       return;
     }
 
-    setXGalleryModeEnabled(document, true, { simplifyPosts: true });
+    setXGalleryModeEnabled(document, true, {
+      settings: currentSettings,
+      simplifyPosts: true,
+    });
     applyXGalleryMode(document, currentSettings);
   }
 

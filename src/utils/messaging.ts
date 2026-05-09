@@ -1,4 +1,4 @@
-import type { ExtensionState } from './storage';
+import type { ExtensionState, GalleryModeSettings } from './storage';
 
 export const MESSAGE_TYPES = {
   ping: 'timeline-gallery/ping',
@@ -20,7 +20,7 @@ export type GetStateMessage = {
 
 export type SetGalleryModeMessage = {
   type: typeof MESSAGE_TYPES.setGalleryMode;
-  enabled: boolean;
+  settings: Partial<GalleryModeSettings>;
 };
 
 export type ContentReadyMessage = {

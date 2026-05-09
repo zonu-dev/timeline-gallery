@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_EXTENSION_STATE,
+  DEFAULT_GALLERY_MODE_SETTINGS,
   normalizeExtensionState,
 } from '../../src/utils/storage';
 
@@ -24,9 +25,20 @@ describe('normalizeExtensionState', () => {
         },
         galleryMode: {
           enabled: true,
-          includeVideos: false,
-          includeGifs: false,
-          includeMultiImagePosts: false,
+          includeVideos: true,
+          includeGifs: true,
+          imageCount: 3,
+          mediaSize: 'l',
+          showAccountInfo: true,
+          showPostTime: true,
+          showRepostContext: true,
+          showLikeCount: true,
+          showRepostCount: true,
+          showReply: true,
+          showViewCount: true,
+          showShareButton: true,
+          showLeftSidebar: true,
+          showRightSidebar: true,
         },
       }),
     ).toEqual({
@@ -39,10 +51,47 @@ describe('normalizeExtensionState', () => {
       },
       galleryMode: {
         enabled: true,
-        includeVideos: false,
-        includeGifs: false,
-        includeMultiImagePosts: false,
+        includeVideos: true,
+        includeGifs: true,
+        imageCount: 3,
+        mediaSize: 'l',
+        showAccountInfo: true,
+        showPostTime: true,
+        showRepostContext: true,
+        showLikeCount: true,
+        showRepostCount: true,
+        showReply: true,
+        showViewCount: true,
+        showShareButton: true,
+        showLeftSidebar: true,
+        showRightSidebar: true,
       },
     });
+  });
+
+  it('normalizes old multi-image settings to the new image count setting', () => {
+    expect(
+      normalizeExtensionState({
+        galleryMode: {
+          enabled: true,
+          includeMultiImagePosts: true,
+        },
+      }).galleryMode,
+    ).toEqual({
+      ...DEFAULT_GALLERY_MODE_SETTINGS,
+      enabled: true,
+      imageCount: 4,
+    });
+  });
+
+  it('falls back to defaults for invalid image count and media size', () => {
+    expect(
+      normalizeExtensionState({
+        galleryMode: {
+          imageCount: 8,
+          mediaSize: 'xl',
+        },
+      }).galleryMode,
+    ).toEqual(DEFAULT_GALLERY_MODE_SETTINGS);
   });
 });

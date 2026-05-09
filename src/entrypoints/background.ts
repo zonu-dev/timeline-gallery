@@ -66,7 +66,7 @@ async function handleMessage(message: ExtensionMessage) {
           ...current,
           galleryMode: {
             ...current.galleryMode,
-            enabled: message.enabled,
+            ...message.settings,
           },
         })),
       };
