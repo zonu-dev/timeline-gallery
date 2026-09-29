@@ -18,11 +18,10 @@ type ToggleSettingKey = Extract<
   | 'showAccountInfo'
   | 'showPostTime'
   | 'showRepostContext'
-  | 'showLikeCount'
-  | 'showRepostCount'
   | 'showReply'
+  | 'showRepostCount'
+  | 'showLikeCount'
   | 'showViewCount'
-  | 'showShareButton'
   | 'showLeftSidebar'
   | 'showRightSidebar'
 >;
@@ -36,11 +35,10 @@ const TOGGLE_SETTINGS: Array<{
   { key: 'showAccountInfo', label: 'アカウント情報表示' },
   { key: 'showPostTime', label: '投稿時間表示' },
   { key: 'showRepostContext', label: 'リポスト者表示' },
-  { key: 'showLikeCount', label: 'いいね数表示' },
-  { key: 'showRepostCount', label: 'リポスト数表示' },
   { key: 'showReply', label: 'リプライ表示' },
+  { key: 'showRepostCount', label: 'リポスト数表示' },
+  { key: 'showLikeCount', label: 'いいね数表示' },
   { key: 'showViewCount', label: '再生数表示' },
-  { key: 'showShareButton', label: '共有ボタン表示' },
   { key: 'showLeftSidebar', label: '左サイドメニュー表示' },
   { key: 'showRightSidebar', label: '右サイドメニュー表示' },
 ];
@@ -164,11 +162,10 @@ function App() {
         <div className="advanced__body">
           <div className="setting-row setting-row--segmented">
             <div className="setting-row__copy">
-              <strong>画像枚数</strong>
-              <span>表示する添付画像数の上限</span>
+              <strong>表示する添付画像数の上限</strong>
             </div>
             <SegmentedControl
-              label="画像枚数"
+              label="表示する添付画像数の上限"
               options={IMAGE_COUNT_OPTIONS.map((value) => ({
                 value,
                 label: String(value),
@@ -184,7 +181,6 @@ function App() {
           <div className="setting-row setting-row--segmented">
             <div className="setting-row__copy">
               <strong>表示サイズ</strong>
-              <span>S / M / L</span>
             </div>
             <SegmentedControl
               label="表示サイズ"
@@ -327,8 +323,6 @@ function areDetailSettingsDefault(settings: GalleryModeSettings): boolean {
       DEFAULT_GALLERY_MODE_SETTINGS.showRepostCount &&
     settings.showReply === DEFAULT_GALLERY_MODE_SETTINGS.showReply &&
     settings.showViewCount === DEFAULT_GALLERY_MODE_SETTINGS.showViewCount &&
-    settings.showShareButton ===
-      DEFAULT_GALLERY_MODE_SETTINGS.showShareButton &&
     settings.showLeftSidebar ===
       DEFAULT_GALLERY_MODE_SETTINGS.showLeftSidebar &&
     settings.showRightSidebar === DEFAULT_GALLERY_MODE_SETTINGS.showRightSidebar

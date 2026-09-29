@@ -20,7 +20,6 @@ export type GalleryModeSettings = {
   showRepostCount: boolean;
   showReply: boolean;
   showViewCount: boolean;
-  showShareButton: boolean;
   showLeftSidebar: boolean;
   showRightSidebar: boolean;
 };
@@ -47,7 +46,6 @@ export const DEFAULT_GALLERY_MODE_SETTINGS: GalleryModeSettings = {
   showRepostCount: false,
   showReply: false,
   showViewCount: false,
-  showShareButton: false,
   showLeftSidebar: false,
   showRightSidebar: false,
 };
@@ -178,10 +176,6 @@ function normalizeGalleryModeSettings(value: unknown): GalleryModeSettings {
       typeof candidate.showViewCount === 'boolean'
         ? candidate.showViewCount
         : DEFAULT_GALLERY_MODE_SETTINGS.showViewCount,
-    showShareButton:
-      typeof candidate.showShareButton === 'boolean'
-        ? candidate.showShareButton
-        : DEFAULT_GALLERY_MODE_SETTINGS.showShareButton,
     showLeftSidebar:
       typeof candidate.showLeftSidebar === 'boolean'
         ? candidate.showLeftSidebar

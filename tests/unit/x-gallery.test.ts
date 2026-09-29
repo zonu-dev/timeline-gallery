@@ -1,19 +1,27 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_GALLERY_MODE_SETTINGS } from '../../src/utils/storage';
 import {
   AD_LABEL_CLASS,
+  GALLERY_ACCOUNT_INFO_PART_ATTRIBUTE,
+  GALLERY_CELL_ATTRIBUTE,
+  GALLERY_COMPOSER_ATTRIBUTE,
+  GALLERY_CONTENT_COLUMN_ATTRIBUTE,
   GALLERY_HIDDEN_CHROME_ATTRIBUTE,
   GALLERY_MENU_SUPPRESSED_ATTRIBUTE,
   GALLERY_MEDIA_BLOCK_ATTRIBUTE,
   GALLERY_MEDIA_ORIENTATION_ATTRIBUTE,
   GALLERY_MEDIA_SIZE_ATTRIBUTE,
   GALLERY_POST_ATTRIBUTE,
+  GALLERY_POST_TIME_LINK_ATTRIBUTE,
+  GALLERY_POST_TIME_SEPARATOR_ATTRIBUTE,
   GALLERY_REPOST_CONTEXT_ATTRIBUTE,
   GALLERY_ROOT_ATTRIBUTE,
   GALLERY_SHOW_ACCOUNT_INFO_ATTRIBUTE,
   GALLERY_SHOW_LEFT_SIDEBAR_ATTRIBUTE,
+  GALLERY_SHOW_POST_TIME_ATTRIBUTE,
   GALLERY_SHOW_REPOST_CONTEXT_ATTRIBUTE,
   GALLERY_SHOW_REPLY_ATTRIBUTE,
+  GALLERY_SHOW_RIGHT_SIDEBAR_ATTRIBUTE,
   GALLERY_SIMPLIFY_POSTS_ATTRIBUTE,
   GALLERY_STYLE_ID,
   NATIVE_MENU_BUTTON_CLASS,
@@ -609,6 +617,79 @@ describe('x-gallery', () => {
     );
   });
 
+  it('marks account metadata separately from the post time', () => {
+    document.body.innerHTML = `
+      <article data-testid="tweet">
+        <div>
+          <div id="metadata-row">
+            <div id="user-name" data-testid="User-Name">
+              <div id="display-name"><span>Fixture User</span></div>
+              <div id="handle-line">
+                <span id="handle">@fixture</span>
+                <span id="separator"> · </span>
+                <a id="time-link" href="/example/status/1"><time datetime="2026-05-06">5月6日</time></a>
+              </div>
+            </div>
+            <a href="/example/status/1/photo/1">
+              <div data-testid="tweetPhoto"><img src="https://pbs.twimg.com/media/a.jpg" /></div>
+            </a>
+            <div role="group"><button data-testid="like"></button></div>
+          </div>
+        </div>
+      </article>
+    `;
+
+    applyXGalleryMode(document, DEFAULT_GALLERY_MODE_SETTINGS);
+
+    expect(
+      document
+        .getElementById('metadata-row')
+        ?.getAttribute(GALLERY_CONTENT_COLUMN_ATTRIBUTE),
+    ).toBe('true');
+    expect(
+      document
+        .getElementById('user-name')
+        ?.getAttribute(GALLERY_HIDDEN_CHROME_ATTRIBUTE),
+    ).toBe('true');
+    expect(
+      document
+        .getElementById('display-name')
+        ?.getAttribute(GALLERY_ACCOUNT_INFO_PART_ATTRIBUTE),
+    ).toBe('true');
+    expect(
+      document
+        .getElementById('handle')
+        ?.getAttribute(GALLERY_ACCOUNT_INFO_PART_ATTRIBUTE),
+    ).toBe('true');
+    expect(
+      document
+        .getElementById('time-link')
+        ?.getAttribute(GALLERY_POST_TIME_LINK_ATTRIBUTE),
+    ).toBe('true');
+    expect(
+      document
+        .getElementById('separator')
+        ?.getAttribute(GALLERY_POST_TIME_SEPARATOR_ATTRIBUTE),
+    ).toBe('true');
+  });
+
+  it('keeps CSS rules for account info and post time independently toggleable', () => {
+    setXGalleryModeEnabled(document, true, { simplifyPosts: true });
+
+    const styleText =
+      document.getElementById(GALLERY_STYLE_ID)?.textContent ?? '';
+
+    expect(styleText).toContain(GALLERY_ACCOUNT_INFO_PART_ATTRIBUTE);
+    expect(styleText).toContain(GALLERY_POST_TIME_LINK_ATTRIBUTE);
+    expect(styleText).toContain(GALLERY_POST_TIME_SEPARATOR_ATTRIBUTE);
+    expect(styleText).toContain(
+      `[${GALLERY_SHOW_ACCOUNT_INFO_ATTRIBUTE}="false"][${GALLERY_SHOW_POST_TIME_ATTRIBUTE}="false"]`,
+    );
+    expect(styleText).toContain(
+      `[${GALLERY_SHOW_POST_TIME_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [${GALLERY_POST_TIME_LINK_ATTRIBUTE}="true"]`,
+    );
+  });
+
   it('marks landscape media with an aspect ratio for gallery layout', () => {
     document.body.innerHTML = `
       <article data-testid="tweet">
@@ -646,6 +727,160 @@ describe('x-gallery', () => {
     ).toBe('120 / 90');
   });
 
+  it('does not hide unclassified timeline cells through the gallery stylesheet', () => {
+    setXGalleryModeEnabled(document, true, { simplifyPosts: true });
+
+    const styleText =
+      document.getElementById(GALLERY_STYLE_ID)?.textContent ?? '';
+
+    expect(styleText).not.toContain(
+      `[data-testid="cellInnerDiv"]:not([${GALLERY_CELL_ATTRIBUTE}`,
+    );
+  });
+
+  it('does not push the layout right when the left sidebar is visible', () => {
+    setXGalleryModeEnabled(document, true, {
+      settings: {
+        ...DEFAULT_GALLERY_MODE_SETTINGS,
+        showLeftSidebar: true,
+      },
+      simplifyPosts: true,
+    });
+
+    const styleText =
+      document.getElementById(GALLERY_STYLE_ID)?.textContent ?? '';
+
+    expect(styleText).toContain(
+      `[${GALLERY_SHOW_LEFT_SIDEBAR_ATTRIBUTE}="true"] main[role="main"]`,
+    );
+    expect(styleText).toContain('--timeline-gallery-left-sidebar-width');
+    expect(styleText).toContain(':has(> header[role="banner"]):has(> main');
+    expect(styleText).toContain('margin-left: 0 !important;');
+  });
+
+  it('centers the full layout width when both sidebars are visible', () => {
+    setXGalleryModeEnabled(document, true, {
+      settings: {
+        ...DEFAULT_GALLERY_MODE_SETTINGS,
+        showLeftSidebar: true,
+        showRightSidebar: true,
+      },
+      simplifyPosts: true,
+    });
+
+    const styleText =
+      document.getElementById(GALLERY_STYLE_ID)?.textContent ?? '';
+
+    expect(styleText).toContain('--timeline-gallery-right-sidebar-width');
+    expect(styleText).toContain(
+      `[${GALLERY_SHOW_LEFT_SIDEBAR_ATTRIBUTE}="true"][${GALLERY_SHOW_RIGHT_SIDEBAR_ATTRIBUTE}="true"] div:has(> header[role="banner"]):has(> main[role="main"])`,
+    );
+    expect(styleText).toContain(
+      'var(--timeline-gallery-left-sidebar-width) + var(--timeline-gallery-primary-width) + var(--timeline-gallery-right-sidebar-width)',
+    );
+    expect(styleText).toContain(
+      `[${GALLERY_SHOW_RIGHT_SIDEBAR_ATTRIBUTE}="true"] [data-testid="sidebarColumn"]`,
+    );
+  });
+
+  it('allows the reply action to be restored on the lower-left side', () => {
+    setXGalleryModeEnabled(document, true, {
+      settings: {
+        ...DEFAULT_GALLERY_MODE_SETTINGS,
+        showReply: true,
+      },
+      simplifyPosts: true,
+    });
+
+    const styleText =
+      document.getElementById(GALLERY_STYLE_ID)?.textContent ?? '';
+
+    expect(styleText).toContain(
+      `button:not([data-testid="reply"]):not([data-testid="like"])`,
+    );
+    expect(styleText).toContain(
+      `[${GALLERY_SHOW_REPLY_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] {`,
+    );
+    expect(styleText).toContain('grid-template-columns: minmax(40px, 1fr)');
+    expect(styleText).toContain(
+      `> div:has([data-testid="reply"]) {\n  grid-column: 1`,
+    );
+  });
+
+  it('preserves existing cell markers and custom actions on repeated applies', () => {
+    document.body.innerHTML = `
+      <div data-testid="cellInnerDiv">
+        <article id="single-image" data-testid="tweet">
+          <a href="/example/status/1"><time datetime="2026-05-06"></time></a>
+          <a href="/example/status/1/photo/1">
+            <div data-testid="tweetPhoto"><img src="https://pbs.twimg.com/media/a.jpg" /></div>
+          </a>
+          <div role="group"><button data-testid="like"></button></div>
+        </article>
+      </div>
+    `;
+
+    applyXGalleryMode(document, DEFAULT_GALLERY_MODE_SETTINGS);
+    const cell = document.querySelector<HTMLElement>(
+      `[data-testid="cellInnerDiv"]`,
+    );
+    const button = document.querySelector(`.${NOT_INTERESTED_BUTTON_CLASS}`);
+    const removeAttribute = vi.spyOn(Element.prototype, 'removeAttribute');
+
+    applyXGalleryMode(document, DEFAULT_GALLERY_MODE_SETTINGS);
+
+    expect(cell?.getAttribute(GALLERY_CELL_ATTRIBUTE)).toBe('single-image');
+    expect(document.querySelector(`.${NOT_INTERESTED_BUTTON_CLASS}`)).toBe(
+      button,
+    );
+    expect(
+      document.querySelectorAll(`.${NOT_INTERESTED_BUTTON_CLASS}`),
+    ).toHaveLength(1);
+    expect(
+      removeAttribute.mock.calls.some(([attribute]) => {
+        return attribute === GALLERY_CELL_ATTRIBUTE;
+      }),
+    ).toBe(false);
+
+    removeAttribute.mockRestore();
+  });
+
+  it('does not call browser scroll APIs while applying gallery markers', () => {
+    document.body.innerHTML = `
+      <div data-testid="cellInnerDiv">
+        <article id="single-image" data-testid="tweet">
+          <a href="/example/status/1"><time datetime="2026-05-06"></time></a>
+          <a href="/example/status/1/photo/1">
+            <div data-testid="tweetPhoto"><img src="https://pbs.twimg.com/media/a.jpg" /></div>
+          </a>
+          <div role="group"><button data-testid="like"></button></div>
+        </article>
+      </div>
+    `;
+    const scrollTo = vi
+      .spyOn(window, 'scrollTo')
+      .mockImplementation(() => undefined);
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    if (!originalScrollIntoView) {
+      Element.prototype.scrollIntoView = () => undefined;
+    }
+    const scrollIntoView = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => undefined);
+
+    setXGalleryModeEnabled(document, true, { simplifyPosts: true });
+    applyXGalleryMode(document, DEFAULT_GALLERY_MODE_SETTINGS);
+
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    scrollTo.mockRestore();
+    scrollIntoView.mockRestore();
+    if (!originalScrollIntoView) {
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+    }
+  });
+
   it('keeps page layout mode enabled while clearing post simplification markers', () => {
     document.body.innerHTML = `
       <article id="single-image" data-testid="tweet">
@@ -670,6 +905,122 @@ describe('x-gallery', () => {
     expect(
       document.querySelector(`.${NOT_INTERESTED_BUTTON_CLASS}`),
     ).toBeNull();
+  });
+
+  it('keeps the composer marker after the composer is hidden', () => {
+    document.body.innerHTML = `
+      <div data-testid="primaryColumn">
+        <div id="composer">
+          <div data-testid="tweetTextarea_0"></div>
+        </div>
+      </div>
+    `;
+    const composer = document.getElementById('composer') as HTMLElement;
+    let composerIsHidden = false;
+    const rect = vi
+      .spyOn(composer, 'getBoundingClientRect')
+      .mockImplementation(() => {
+        const width = composerIsHidden ? 0 : 640;
+        const height = composerIsHidden ? 0 : 120;
+        return {
+          x: 0,
+          y: 0,
+          width,
+          height,
+          top: 0,
+          right: width,
+          bottom: height,
+          left: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      });
+
+    applyXGalleryMode(document, DEFAULT_GALLERY_MODE_SETTINGS);
+    expect(composer.getAttribute(GALLERY_COMPOSER_ATTRIBUTE)).toBe('true');
+
+    composerIsHidden = true;
+    applyXGalleryMode(document, DEFAULT_GALLERY_MODE_SETTINGS);
+    expect(composer.getAttribute(GALLERY_COMPOSER_ATTRIBUTE)).toBe('true');
+
+    rect.mockRestore();
+  });
+
+  it('marks the outer composer container when multiple composer ancestors match', () => {
+    document.body.innerHTML = `
+      <div data-testid="primaryColumn">
+        <div id="outer-composer">
+          <div id="inner-composer">
+            <div data-testid="tweetTextarea_0"></div>
+          </div>
+        </div>
+      </div>
+    `;
+    const outerComposer = document.getElementById(
+      'outer-composer',
+    ) as HTMLElement;
+    const innerComposer = document.getElementById(
+      'inner-composer',
+    ) as HTMLElement;
+    const outerRect = vi
+      .spyOn(outerComposer, 'getBoundingClientRect')
+      .mockReturnValue({
+        x: 0,
+        y: 0,
+        width: 640,
+        height: 180,
+        top: 0,
+        right: 640,
+        bottom: 180,
+        left: 0,
+        toJSON: () => ({}),
+      } as DOMRect);
+    const innerRect = vi
+      .spyOn(innerComposer, 'getBoundingClientRect')
+      .mockReturnValue({
+        x: 0,
+        y: 0,
+        width: 640,
+        height: 100,
+        top: 0,
+        right: 640,
+        bottom: 100,
+        left: 0,
+        toJSON: () => ({}),
+      } as DOMRect);
+
+    applyXGalleryMode(document, DEFAULT_GALLERY_MODE_SETTINGS);
+
+    expect(outerComposer.getAttribute(GALLERY_COMPOSER_ATTRIBUTE)).toBe('true');
+    expect(innerComposer.hasAttribute(GALLERY_COMPOSER_ATTRIBUTE)).toBe(false);
+
+    outerRect.mockRestore();
+    innerRect.mockRestore();
+  });
+
+  it('removes a stale composer marker from an ancestor that now contains posts', () => {
+    document.body.innerHTML = `
+      <div data-testid="primaryColumn">
+        <div id="stale-composer" ${GALLERY_COMPOSER_ATTRIBUTE}="true">
+          <div>
+            <div data-testid="tweetTextarea_0"></div>
+          </div>
+          <article data-testid="tweet">
+            <a href="/example/status/1/photo/1">
+              <div data-testid="tweetPhoto"><img src="https://pbs.twimg.com/media/a.jpg" /></div>
+            </a>
+            <div role="group"><button data-testid="like"></button></div>
+          </article>
+        </div>
+      </div>
+    `;
+
+    applyXGalleryMode(document, DEFAULT_GALLERY_MODE_SETTINGS);
+
+    expect(
+      document
+        .getElementById('stale-composer')
+        ?.hasAttribute(GALLERY_COMPOSER_ATTRIBUTE),
+    ).toBe(false);
   });
 
   it('sets root attributes for gallery detail settings', () => {

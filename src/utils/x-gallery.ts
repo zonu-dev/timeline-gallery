@@ -17,8 +17,6 @@ export const GALLERY_SHOW_REPOST_COUNT_ATTRIBUTE =
 export const GALLERY_SHOW_REPLY_ATTRIBUTE = 'data-timeline-gallery-show-reply';
 export const GALLERY_SHOW_VIEW_COUNT_ATTRIBUTE =
   'data-timeline-gallery-show-view-count';
-export const GALLERY_SHOW_SHARE_BUTTON_ATTRIBUTE =
-  'data-timeline-gallery-show-share-button';
 export const GALLERY_SHOW_LEFT_SIDEBAR_ATTRIBUTE =
   'data-timeline-gallery-show-left-sidebar';
 export const GALLERY_SHOW_RIGHT_SIDEBAR_ATTRIBUTE =
@@ -41,6 +39,12 @@ export const GALLERY_HIDDEN_CHROME_ATTRIBUTE =
   'data-timeline-gallery-hidden-chrome';
 export const GALLERY_REPOST_CONTEXT_ATTRIBUTE =
   'data-timeline-gallery-repost-context';
+export const GALLERY_ACCOUNT_INFO_PART_ATTRIBUTE =
+  'data-timeline-gallery-account-info-part';
+export const GALLERY_POST_TIME_LINK_ATTRIBUTE =
+  'data-timeline-gallery-post-time-link';
+export const GALLERY_POST_TIME_SEPARATOR_ATTRIBUTE =
+  'data-timeline-gallery-post-time-separator';
 export const GALLERY_MENU_SUPPRESSED_ATTRIBUTE =
   'data-timeline-gallery-menu-suppressed';
 const GALLERY_NATIVE_MENU_REASON_ATTRIBUTE =
@@ -51,6 +55,9 @@ export const NATIVE_MENU_BUTTON_CLASS = 'timeline-gallery-native-menu';
 export const AD_LABEL_CLASS = 'timeline-gallery-ad-label';
 
 const MENU_SUPPRESSION_CLEAR_DELAY_MS = 120;
+const COMPOSER_CONTAINER_MIN_WIDTH = 520;
+const COMPOSER_CONTAINER_MIN_HEIGHT = 80;
+const COMPOSER_CONTAINER_MAX_HEIGHT = 360;
 
 export type GalleryPostState =
   | 'single-image'
@@ -82,21 +89,22 @@ const nativeMenuButtonLocations = new WeakMap<
     parent: Node;
   }
 >();
+const mediaOrientationImages = new WeakSet<HTMLImageElement>();
 
 export function applyXGalleryMode(
   documentRef: Document,
   settings: GalleryModeSettings,
 ): GalleryApplySummary {
   const articles = findTimelineArticles(documentRef);
-  clearGalleryLayoutMarkers(documentRef);
-  markComposerContainers(documentRef);
+  clearDetachedGalleryCells(documentRef);
   let visiblePosts = 0;
   let hiddenPosts = 0;
 
   for (const article of articles) {
     const state = classifyGalleryPost(article, settings);
-    article.setAttribute(GALLERY_POST_ATTRIBUTE, state);
+    setAttributeIfChanged(article, GALLERY_POST_ATTRIBUTE, state);
     markGalleryCell(article, state);
+    clearArticleLayoutMarkers(article);
 
     if (state === 'single-image') {
       visiblePosts += 1;
@@ -107,6 +115,8 @@ export function applyXGalleryMode(
       removeTrailingAction(article);
     }
   }
+
+  markComposerContainers(documentRef);
 
   return {
     visiblePosts,
@@ -175,10 +185,6 @@ function setGallerySettingsAttributes(
   root.setAttribute(
     GALLERY_SHOW_VIEW_COUNT_ATTRIBUTE,
     String(settings.showViewCount),
-  );
-  root.setAttribute(
-    GALLERY_SHOW_SHARE_BUTTON_ATTRIBUTE,
-    String(settings.showShareButton),
   );
   root.setAttribute(
     GALLERY_SHOW_LEFT_SIDEBAR_ATTRIBUTE,
@@ -274,19 +280,88 @@ function clearGalleryLayoutMarkers(documentRef: Document): void {
     GALLERY_ACTIONS_BLOCK_ATTRIBUTE,
     GALLERY_HIDDEN_CHROME_ATTRIBUTE,
     GALLERY_REPOST_CONTEXT_ATTRIBUTE,
+    GALLERY_ACCOUNT_INFO_PART_ATTRIBUTE,
+    GALLERY_POST_TIME_LINK_ATTRIBUTE,
+    GALLERY_POST_TIME_SEPARATOR_ATTRIBUTE,
   ];
 
   for (const attribute of attributes) {
-    for (const element of documentRef.querySelectorAll(`[${attribute}]`)) {
+    for (const element of documentRef.querySelectorAll<HTMLElement>(
+      `[${attribute}]`,
+    )) {
       element.removeAttribute(attribute);
+      if (attribute === GALLERY_MEDIA_BLOCK_ATTRIBUTE) {
+        element.style.removeProperty('--timeline-gallery-media-aspect-ratio');
+      }
+    }
+  }
+}
+
+function clearDetachedGalleryCells(documentRef: Document): void {
+  for (const cell of documentRef.querySelectorAll<HTMLElement>(
+    `[${GALLERY_CELL_ATTRIBUTE}]`,
+  )) {
+    if (
+      !cell.querySelector(
+        'article[data-testid="tweet"], article[role="article"]',
+      )
+    ) {
+      cell.removeAttribute(GALLERY_CELL_ATTRIBUTE);
+    }
+  }
+}
+
+const ARTICLE_LAYOUT_ATTRIBUTES = [
+  GALLERY_SIDE_RAIL_ATTRIBUTE,
+  GALLERY_CONTENT_COLUMN_ATTRIBUTE,
+  GALLERY_MEDIA_BLOCK_ATTRIBUTE,
+  GALLERY_MEDIA_FRAME_ATTRIBUTE,
+  GALLERY_MEDIA_ORIENTATION_ATTRIBUTE,
+  GALLERY_ACTIONS_BLOCK_ATTRIBUTE,
+  GALLERY_HIDDEN_CHROME_ATTRIBUTE,
+  GALLERY_REPOST_CONTEXT_ATTRIBUTE,
+  GALLERY_ACCOUNT_INFO_PART_ATTRIBUTE,
+  GALLERY_POST_TIME_LINK_ATTRIBUTE,
+  GALLERY_POST_TIME_SEPARATOR_ATTRIBUTE,
+];
+
+function clearArticleLayoutMarkers(article: HTMLElement): void {
+  for (const attribute of ARTICLE_LAYOUT_ATTRIBUTES) {
+    if (article.hasAttribute(attribute)) {
+      article.removeAttribute(attribute);
+      if (attribute === GALLERY_MEDIA_BLOCK_ATTRIBUTE) {
+        article.style.removeProperty('--timeline-gallery-media-aspect-ratio');
+      }
+    }
+
+    for (const element of article.querySelectorAll<HTMLElement>(
+      `[${attribute}]`,
+    )) {
+      element.removeAttribute(attribute);
+      if (attribute === GALLERY_MEDIA_BLOCK_ATTRIBUTE) {
+        element.style.removeProperty('--timeline-gallery-media-aspect-ratio');
+      }
     }
   }
 }
 
 function markGalleryCell(article: HTMLElement, state: GalleryPostState): void {
-  article
-    .closest<HTMLElement>('[data-testid="cellInnerDiv"]')
-    ?.setAttribute(GALLERY_CELL_ATTRIBUTE, state);
+  const cell = article.closest<HTMLElement>('[data-testid="cellInnerDiv"]');
+  if (!cell) {
+    return;
+  }
+
+  setAttributeIfChanged(cell, GALLERY_CELL_ATTRIBUTE, state);
+}
+
+function setAttributeIfChanged(
+  element: Element,
+  name: string,
+  value: string,
+): void {
+  if (element.getAttribute(name) !== value) {
+    element.setAttribute(name, value);
+  }
 }
 
 function markSingleImagePostLayout(article: HTMLElement): void {
@@ -322,6 +397,7 @@ function markSingleImagePostLayout(article: HTMLElement): void {
   }
 
   markSocialContextRows(article, media);
+  markPostMetadata(article);
 
   for (const child of Array.from(contentColumn.children)) {
     if (child !== mediaBlock && child !== actionsBlock) {
@@ -376,6 +452,70 @@ function markSocialContextRows(article: HTMLElement, media: HTMLElement): void {
     }
     row.setAttribute(GALLERY_HIDDEN_CHROME_ATTRIBUTE, 'true');
   }
+}
+
+function markPostMetadata(article: HTMLElement): void {
+  const mainStatusPath = findMainStatusPath(article);
+
+  for (const time of article.querySelectorAll<HTMLElement>('time')) {
+    const timeLink = time.closest<HTMLElement>('a[href*="/status/"]');
+    if (!timeLink) {
+      continue;
+    }
+
+    const timeStatusPath =
+      timeLink instanceof HTMLAnchorElement
+        ? normalizeStatusPath(timeLink.getAttribute('href'))
+        : null;
+    if (mainStatusPath && timeStatusPath && timeStatusPath !== mainStatusPath) {
+      continue;
+    }
+
+    timeLink.setAttribute(GALLERY_POST_TIME_LINK_ATTRIBUTE, 'true');
+
+    const userName = time.closest<HTMLElement>('[data-testid="User-Name"]');
+    if (!userName) {
+      continue;
+    }
+
+    markPostTimeSeparators(userName);
+    markAccountInfoParts(userName, timeLink);
+  }
+}
+
+function markPostTimeSeparators(userName: HTMLElement): void {
+  for (const element of userName.querySelectorAll<HTMLElement>('*')) {
+    if (element.children.length > 0) {
+      continue;
+    }
+
+    if (isPostTimeSeparatorText(element.textContent)) {
+      element.setAttribute(GALLERY_POST_TIME_SEPARATOR_ATTRIBUTE, 'true');
+    }
+  }
+}
+
+function markAccountInfoParts(
+  userName: HTMLElement,
+  timeLink: HTMLElement,
+): void {
+  for (const element of userName.querySelectorAll<HTMLElement>('*')) {
+    if (
+      element === timeLink ||
+      timeLink.contains(element) ||
+      element.contains(timeLink) ||
+      element.hasAttribute(GALLERY_POST_TIME_SEPARATOR_ATTRIBUTE)
+    ) {
+      continue;
+    }
+
+    element.setAttribute(GALLERY_ACCOUNT_INFO_PART_ATTRIBUTE, 'true');
+  }
+}
+
+function isPostTimeSeparatorText(text: string | null): boolean {
+  const normalized = text?.replace(/\s/g, '') ?? '';
+  return normalized === '·' || normalized === '•';
 }
 
 function findLargestAncestorWithoutDescendant(
@@ -526,7 +666,8 @@ function markMediaOrientation(
 
   applyOrientation();
 
-  if (!image.complete) {
+  if (!image.complete && !mediaOrientationImages.has(image)) {
+    mediaOrientationImages.add(image);
     image.addEventListener('load', applyOrientation, { once: true });
   }
 }
@@ -575,17 +716,27 @@ function findDirectChildContaining(
 }
 
 function markComposerContainers(documentRef: Document): void {
-  for (const composer of documentRef.querySelectorAll(
-    `[${GALLERY_COMPOSER_ATTRIBUTE}]`,
-  )) {
-    composer.removeAttribute(GALLERY_COMPOSER_ATTRIBUTE);
-  }
+  const currentComposers = new Set<HTMLElement>();
 
   for (const textArea of documentRef.querySelectorAll<HTMLElement>(
     '[data-testid="tweetTextarea_0"]',
   )) {
     const container = findComposerContainer(textArea);
-    container?.setAttribute(GALLERY_COMPOSER_ATTRIBUTE, 'true');
+    if (container) {
+      currentComposers.add(container);
+    }
+  }
+
+  for (const composer of documentRef.querySelectorAll<HTMLElement>(
+    `[${GALLERY_COMPOSER_ATTRIBUTE}]`,
+  )) {
+    if (!currentComposers.has(composer)) {
+      composer.removeAttribute(GALLERY_COMPOSER_ATTRIBUTE);
+    }
+  }
+
+  for (const composer of currentComposers) {
+    setAttributeIfChanged(composer, GALLERY_COMPOSER_ATTRIBUTE, 'true');
   }
 }
 
@@ -598,8 +749,16 @@ function findComposerContainer(textArea: HTMLElement): HTMLElement | null {
       break;
     }
 
+    if (current.hasAttribute(GALLERY_COMPOSER_ATTRIBUTE)) {
+      candidate = current;
+    }
+
     const rect = current.getBoundingClientRect();
-    if (rect.width >= 520 && rect.height >= 80) {
+    if (
+      rect.width >= COMPOSER_CONTAINER_MIN_WIDTH &&
+      rect.height >= COMPOSER_CONTAINER_MIN_HEIGHT &&
+      rect.height <= COMPOSER_CONTAINER_MAX_HEIGHT
+    ) {
       candidate = current;
     }
 
@@ -1041,6 +1200,8 @@ html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_MENU_SUPPRESSED_ATTRIBUTE}="tru
 }
 
 html[${GALLERY_ROOT_ATTRIBUTE}="true"] {
+  --timeline-gallery-left-sidebar-width: 275px;
+  --timeline-gallery-right-sidebar-width: 350px;
   --timeline-gallery-primary-width: 640px;
   --timeline-gallery-content-width: 600px;
   --timeline-gallery-portrait-height: min(72vh, 920px);
@@ -1085,15 +1246,59 @@ html[${GALLERY_ROOT_ATTRIBUTE}="true"] [data-testid="primaryColumn"] > div {
   margin-left: auto !important;
 }
 
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_LEFT_SIDEBAR_ATTRIBUTE}="true"] main[role="main"],
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_RIGHT_SIDEBAR_ATTRIBUTE}="true"] main[role="main"] {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_LEFT_SIDEBAR_ATTRIBUTE}="false"][${GALLERY_SHOW_RIGHT_SIDEBAR_ATTRIBUTE}="true"] div:has(> header[role="banner"]):has(> main[role="main"]) {
+  width: min(100vw, calc(var(--timeline-gallery-primary-width) + var(--timeline-gallery-right-sidebar-width))) !important;
+  max-width: min(100vw, calc(var(--timeline-gallery-primary-width) + var(--timeline-gallery-right-sidebar-width))) !important;
+  flex: 0 0 min(100vw, calc(var(--timeline-gallery-primary-width) + var(--timeline-gallery-right-sidebar-width))) !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
+}
+
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_LEFT_SIDEBAR_ATTRIBUTE}="true"][${GALLERY_SHOW_RIGHT_SIDEBAR_ATTRIBUTE}="false"] div:has(> header[role="banner"]):has(> main[role="main"]) {
+  width: min(100vw, calc(var(--timeline-gallery-left-sidebar-width) + var(--timeline-gallery-primary-width))) !important;
+  max-width: min(100vw, calc(var(--timeline-gallery-left-sidebar-width) + var(--timeline-gallery-primary-width))) !important;
+  flex: 0 0 min(100vw, calc(var(--timeline-gallery-left-sidebar-width) + var(--timeline-gallery-primary-width))) !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
+}
+
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_LEFT_SIDEBAR_ATTRIBUTE}="true"][${GALLERY_SHOW_RIGHT_SIDEBAR_ATTRIBUTE}="true"] div:has(> header[role="banner"]):has(> main[role="main"]) {
+  width: min(100vw, calc(var(--timeline-gallery-left-sidebar-width) + var(--timeline-gallery-primary-width) + var(--timeline-gallery-right-sidebar-width))) !important;
+  max-width: min(100vw, calc(var(--timeline-gallery-left-sidebar-width) + var(--timeline-gallery-primary-width) + var(--timeline-gallery-right-sidebar-width))) !important;
+  flex: 0 0 min(100vw, calc(var(--timeline-gallery-left-sidebar-width) + var(--timeline-gallery-primary-width) + var(--timeline-gallery-right-sidebar-width))) !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
+}
+
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_LEFT_SIDEBAR_ATTRIBUTE}="true"] header[role="banner"] {
+  width: var(--timeline-gallery-left-sidebar-width) !important;
+  max-width: var(--timeline-gallery-left-sidebar-width) !important;
+  flex: 0 0 var(--timeline-gallery-left-sidebar-width) !important;
+}
+
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_LEFT_SIDEBAR_ATTRIBUTE}="true"] main[role="main"],
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_RIGHT_SIDEBAR_ATTRIBUTE}="true"] main[role="main"] {
+  flex: 0 0 min(100vw, var(--timeline-gallery-primary-width)) !important;
+}
+
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_RIGHT_SIDEBAR_ATTRIBUTE}="true"] [data-testid="sidebarColumn"],
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_RIGHT_SIDEBAR_ATTRIBUTE}="true"] aside[aria-label] {
+  width: var(--timeline-gallery-right-sidebar-width) !important;
+  max-width: var(--timeline-gallery-right-sidebar-width) !important;
+  flex: 0 0 var(--timeline-gallery-right-sidebar-width) !important;
+}
+
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SIMPLIFY_POSTS_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}^="hidden"] {
   display: none !important;
 }
 
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SIMPLIFY_POSTS_ATTRIBUTE}="true"] [${GALLERY_CELL_ATTRIBUTE}^="hidden"] {
-  display: none !important;
-}
-
-html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SIMPLIFY_POSTS_ATTRIBUTE}="true"] [data-testid="cellInnerDiv"]:not([${GALLERY_CELL_ATTRIBUTE}="single-image"]) {
   display: none !important;
 }
 
@@ -1171,13 +1376,24 @@ html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_REPOST_CONTEXT_ATTRIBUTE}=
   display: block !important;
 }
 
-html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_ACCOUNT_INFO_ATTRIBUTE}="false"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [data-testid="User-Name"],
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_ACCOUNT_INFO_ATTRIBUTE}="false"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [data-testid^="UserAvatar-Container"] {
+  display: none !important;
+}
+
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_ACCOUNT_INFO_ATTRIBUTE}="false"][${GALLERY_SHOW_POST_TIME_ATTRIBUTE}="false"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [data-testid="User-Name"],
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_ACCOUNT_INFO_ATTRIBUTE}="false"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [${GALLERY_ACCOUNT_INFO_PART_ATTRIBUTE}="true"],
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_ACCOUNT_INFO_ATTRIBUTE}="false"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [${GALLERY_POST_TIME_SEPARATOR_ATTRIBUTE}="true"],
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_POST_TIME_ATTRIBUTE}="false"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [${GALLERY_POST_TIME_LINK_ATTRIBUTE}="true"],
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_POST_TIME_ATTRIBUTE}="false"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [${GALLERY_POST_TIME_SEPARATOR_ATTRIBUTE}="true"] {
   display: none !important;
 }
 
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_POST_TIME_ATTRIBUTE}="false"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] time {
   display: none !important;
+}
+
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_POST_TIME_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [${GALLERY_POST_TIME_LINK_ATTRIBUTE}="true"] {
+  display: inline-flex !important;
 }
 
 html[${GALLERY_ROOT_ATTRIBUTE}="true"] [${GALLERY_MEDIA_FRAME_ATTRIBUTE}="true"],
@@ -1283,7 +1499,7 @@ html[${GALLERY_ROOT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single
 html[${GALLERY_ROOT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has(a[href*="/analytics"]),
 html[${GALLERY_ROOT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has([aria-label*="View"]),
 html[${GALLERY_ROOT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has([aria-label*="表示"]),
-html[${GALLERY_ROOT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has(button:not([data-testid="like"]):not([data-testid="unlike"]):not([data-testid="retweet"]):not([data-testid="unretweet"]):not([data-testid="bookmark"]):not([data-testid="removeBookmark"]):not(.${NATIVE_MENU_BUTTON_CLASS})) {
+html[${GALLERY_ROOT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has(button:not([data-testid="reply"]):not([data-testid="like"]):not([data-testid="unlike"]):not([data-testid="retweet"]):not([data-testid="unretweet"]):not([data-testid="bookmark"]):not([data-testid="removeBookmark"]):not(.${NATIVE_MENU_BUTTON_CLASS})) {
   display: none !important;
 }
 
@@ -1307,17 +1523,20 @@ html[${GALLERY_ROOT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single
   display: none !important;
 }
 
-html[${GALLERY_ROOT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] button:not([data-testid="like"]):not([data-testid="unlike"]):not([data-testid="retweet"]):not([data-testid="unretweet"]):not([data-testid="bookmark"]):not([data-testid="removeBookmark"]):not(.${NOT_INTERESTED_BUTTON_CLASS}):not(.${NATIVE_MENU_BUTTON_CLASS}) {
+html[${GALLERY_ROOT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] button:not([data-testid="reply"]):not([data-testid="like"]):not([data-testid="unlike"]):not([data-testid="retweet"]):not([data-testid="unretweet"]):not([data-testid="bookmark"]):not([data-testid="removeBookmark"]):not(.${NOT_INTERESTED_BUTTON_CLASS}):not(.${NATIVE_MENU_BUTTON_CLASS}) {
   display: none !important;
+}
+
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_REPLY_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] {
+  grid-template-columns: minmax(40px, 1fr) !important;
+  grid-auto-columns: minmax(40px, max-content) !important;
+  justify-content: stretch !important;
 }
 
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_REPLY_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has([data-testid="reply"]),
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_VIEW_COUNT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has(a[href*="/analytics"]),
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_VIEW_COUNT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has([aria-label*="View"]),
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_VIEW_COUNT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has([aria-label*="表示"]),
-html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_SHARE_BUTTON_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has([data-testid="sendShare"]),
-html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_SHARE_BUTTON_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has([aria-label*="Share"]),
-html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_SHARE_BUTTON_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has([aria-label*="共有"]),
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_LIKE_COUNT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has([data-testid="like"]),
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_LIKE_COUNT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has([data-testid="unlike"]),
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_REPOST_COUNT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has([data-testid="retweet"]),
@@ -1328,13 +1547,15 @@ html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_REPOST_COUNT_ATTRIBUTE}="t
   max-width: none !important;
 }
 
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_REPLY_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] > div:has([data-testid="reply"]) {
+  grid-column: 1 !important;
+  justify-self: start !important;
+}
+
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_REPLY_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] [data-testid="reply"],
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_VIEW_COUNT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] a[href*="/analytics"],
 html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_VIEW_COUNT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] [aria-label*="View"],
-html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_VIEW_COUNT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] [aria-label*="表示"],
-html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_SHARE_BUTTON_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] [data-testid="sendShare"],
-html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_SHARE_BUTTON_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] [aria-label*="Share"],
-html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_SHARE_BUTTON_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] [aria-label*="共有"] {
+html[${GALLERY_ROOT_ATTRIBUTE}="true"][${GALLERY_SHOW_VIEW_COUNT_ATTRIBUTE}="true"] article[${GALLERY_POST_ATTRIBUTE}="single-image"] [role="group"] [aria-label*="表示"] {
   display: inline-grid !important;
 }
 

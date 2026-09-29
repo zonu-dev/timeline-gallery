@@ -8,12 +8,27 @@ const authProfileDir = resolve(root, '.wxt/headless-auth-profile');
 const headlessProfileDir = resolve(root, '.wxt/headless-run-profile');
 const extensionDir = resolve(root, '.output/chrome-mv3');
 const inspectionDir = resolve(root, '.wxt/inspection');
+const inspectionUrl =
+  process.env.TIMELINE_GALLERY_INSPECT_URL ?? 'https://x.com/home';
 const chromePath =
   process.env.CHROME_EXECUTABLE_PATH ??
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const enableGallery = process.argv.includes('--enable-gallery');
 const galleryImageCount = parseGalleryImageCount(
   process.env.TIMELINE_GALLERY_IMAGE_COUNT,
+);
+const showLeftSidebar = parseBooleanEnv(
+  process.env.TIMELINE_GALLERY_SHOW_LEFT_SIDEBAR,
+);
+const showRightSidebar = parseBooleanEnv(
+  process.env.TIMELINE_GALLERY_SHOW_RIGHT_SIDEBAR,
+);
+const showReply = parseBooleanEnv(process.env.TIMELINE_GALLERY_SHOW_REPLY);
+const showAccountInfo = parseBooleanEnv(
+  process.env.TIMELINE_GALLERY_SHOW_ACCOUNT_INFO,
+);
+const showPostTime = parseBooleanEnv(
+  process.env.TIMELINE_GALLERY_SHOW_POST_TIME,
 );
 const extensionName = 'Timeline Gallery';
 
@@ -50,6 +65,7 @@ const rsync = spawnSync(
     '--exclude=Default/Extensions/*',
     '--exclude=Default/IndexedDB/*',
     '--exclude=Default/Local Extension Settings/*',
+    '--exclude=Default/Session Storage/*',
     '--exclude=Safe Browsing/*',
     `${authProfileDir}/`,
     `${headlessProfileDir}/`,
@@ -85,7 +101,7 @@ try {
     Object.defineProperty(navigator, 'webdriver', { get: () => false });
   });
 
-  await page.goto('https://x.com/home', {
+  await page.goto(inspectionUrl, {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
@@ -113,6 +129,11 @@ try {
     if (enableGallery) {
       await setGalleryMode(browser, true, {
         imageCount: galleryImageCount,
+        showLeftSidebar,
+        showRightSidebar,
+        showReply,
+        showAccountInfo,
+        showPostTime,
       });
       await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
       await page.waitForSelector('main[role="main"]', { timeout: 30_000 });
@@ -166,16 +187,15 @@ async function setGalleryMode(browser, enabled, options) {
             includeGifs: false,
             imageCount: nextOptions.imageCount,
             mediaSize: 'm',
-            showAccountInfo: false,
-            showPostTime: false,
+            showAccountInfo: nextOptions.showAccountInfo,
+            showPostTime: nextOptions.showPostTime,
             showRepostContext: false,
             showLikeCount: false,
             showRepostCount: false,
-            showReply: false,
+            showReply: nextOptions.showReply,
             showViewCount: false,
-            showShareButton: false,
-            showLeftSidebar: false,
-            showRightSidebar: false,
+            showLeftSidebar: nextOptions.showLeftSidebar,
+            showRightSidebar: nextOptions.showRightSidebar,
           },
         },
       });
@@ -187,6 +207,10 @@ async function setGalleryMode(browser, enabled, options) {
 function parseGalleryImageCount(value) {
   const parsed = Number(value ?? 1);
   return parsed === 2 || parsed === 3 || parsed === 4 ? parsed : 1;
+}
+
+function parseBooleanEnv(value) {
+  return value === '1' || value === 'true';
 }
 
 async function findExtensionWorker(browser) {
@@ -256,6 +280,15 @@ async function readXPageSummary(page) {
       marker: document.documentElement.dataset.timelineGalleryExtension ?? null,
       galleryEnabled: document.documentElement.getAttribute(
         'data-timeline-gallery-enabled',
+      ),
+      gallerySimplifyPosts: document.documentElement.getAttribute(
+        'data-timeline-gallery-simplify-posts',
+      ),
+      galleryShowLeftSidebar: document.documentElement.getAttribute(
+        'data-timeline-gallery-show-left-sidebar',
+      ),
+      galleryShowRightSidebar: document.documentElement.getAttribute(
+        'data-timeline-gallery-show-right-sidebar',
       ),
       articleCount: articles.length,
       visibleArticleCount: visibleArticles.length,
